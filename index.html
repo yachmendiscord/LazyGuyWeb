@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lazy Guy</title>
+    <link rel="icon" href="resources/icon.png" type="image/png"> 
+    <link rel="stylesheet" href="style.css"> 
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfSGi4a4Wcc9xJK_LKC5tfPHA-JhifbfU",
+            authDomain: "lazyguynewsfetching.firebaseapp.com",
+            projectId: "lazyguynewsfetching",
+            storageBucket: "lazyguynewsfetching.firebasestorage.app",
+            messagingSenderId: "208002316771",
+            appId: "1:208002316771:web:842345ef347d1660a448d6",
+            measurementId: "G-WD69LY3CQB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        function formatTimestamp(seconds, nanoseconds) {
+            const date = new Date(seconds * 1000 + Math.floor(nanoseconds / 1000000));
+            return date.toLocaleString('ru-RU', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        async function checkServerStatus() {
+            const statusButton = document.getElementById('server-status-button');
+            let isServerRunning = false;
+
+            try {
+                const docRef = doc(db, 'server', 'official_server'); 
+                const docSnap = await getDoc(docRef); 
+
+                if (!docSnap.exists()) {
+                    statusButton.innerHTML = 'Ошибка базы данных.';
+                    return;
+                }
+
+                const foundDocumentData = docSnap.data();
+                isServerRunning = foundDocumentData.started; 
+
+                statusButton.textContent = isServerRunning ? 'Сервер запущен' : 'Сервер остановлен';
+                statusButton.style.backgroundColor = isServerRunning ? '#28a745' : '#dc3545'; 
+
+                if (isServerRunning) {      
+                    statusButton.onclick = function() {
+                        showSection('server-info');
+                    };
+                } else {
+                    const serverInfoSection = document.getElementById('server-info');
+                    serverInfoSection.style.display = 'none';
+                }
+            } catch (error) {
+                statusButton.innerHTML = 'Ошибка базы данных'
+            }
+
+            showSection("news");
+        }
+
+        
+        async function showSection(sectionId) {
+            const sections = document.querySelectorAll('.content');
+            sections.forEach(section => {
+                section.style.display = 'none';
+            });
+
+            const selectedSection = document.getElementById(sectionId);
+            selectedSection.style.display = 'block';
+            
+            if (sectionId === 'news') {
+                const newsContainer = document.querySelector('#news .data-text');
+                newsContainer.innerHTML = 'Загрузка новостей...';
+
+                try {
+                    const snapshot = await getDocs(collection(db, 'news'));
+                    if (snapshot.empty) {
+                        newsContainer.innerHTML = 'Нет новостей.';
+                        return;
+                    }
+
+                    let newsHtml = '';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        newsHtml += `<div class="news_main"><h3 class="news_title">${data.title}</h3><p class="news_content">${data.content}</p><p class="news_date">${formatTimestamp(data.date.seconds, data.date.nanoseconds)}</p></div>`;
+                    });
+                    newsContainer.innerHTML = newsHtml;
+                } catch (error) {
+                    newsContainer.innerHTML = 'Ошибка при получении новостей: ' + error.message;
+                }
+            } else if (sectionId === 'resources') {
+                const resourcesContainer = document.querySelector('#resources .data-text');
+                resourcesContainer.innerHTML = 'Загрузка ресурсов...';
+
+                try {
+                    const snapshot = await getDocs(collection(db, 'download_links'));
+                    if (snapshot.empty) {
+                        resourcesContainer.innerHTML = 'На данный момент нет ссылок на скачивание игры :(.';
+                        return;
+                    }
+
+                    let newsHtml = '';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                                            newsHtml += `<div class="resources_main"><h3 class="resources_title">${data.title}</h3><p class="resources_content">${data.update_info}</p><p class="resources_version">${data.version}</p><a href="${data.download_link}"><button class="resources_button">Загрузить</button></a><p class="resources_date">${formatTimestamp(data.date.seconds, data.date.nanoseconds)}</p></div>`;
+                    });
+                    resourcesContainer.innerHTML = newsHtml;
+                } catch (error) {
+                    resourcesContainer.innerHTML = 'Ошибка при получении ресурсов: ' + error.message;
+                }
+            }
+        }
+
+        window.showSection = showSection; 
+        window.onload = checkServerStatus; 
+    </script>
+</head>
+<body>
+
+<header>
+    <div style="display: flex; align-items: center;">
+        <img src="resources/icon.png" alt="Иконка" style="width: 40px; height: 40px;">
+        <span class="name_txt">Lazy Guy</span>
+    </div>
+    <nav>
+        <a href="#" onclick="showSection('news')">Новости</a>
+        <a href="#" onclick="showSection('info')">Информация</a>
+        <a href="#" onclick="showSection('resources')">Ресурсы</a>
+    </nav>
+    <div style="margin-left: 20px;">
+        <button id="server-status-button" style="padding: 10px 15px; border: none; border-radius: 5px; color: white; background-color: #007BFF; cursor: pointer;">Проверка состояния сервера...</button>
+    </div>
+</header>
+
+
+<main>
+    <section id="news" class="content">
+        <h2>Новости</h2>
+        <div class="data-text">нажмите на кнопку "Новости" для загрузки новостей.</div>
+    </section>
+    <section id="info" class="content" style="display: none;">
+        <h2>Информация</h2>
+        <div class="info_main">
+            <p>Разработчик: <strong>yachmen</strong></p>
+            <p>Это сайт, который предоставляет всю новую информацию об проекте LazyGuy для пользователей.</p>
+            <p>Присоединяйтесь к нашему <a href="https://discord.gg/VHk8KWbCYh" target="_blank" style="color: #007BFF; text-decoration: underline;">Discord-серверу</a>, чтобы быть в курсе последних обновлений и общаться с другими пользователями!</p>
+            <p>Что же такое <strong>LazyGuy</strong>?</p>
+            <p>LazyGuy - некоммерческий проект, игра на основе шутера, созданная на Unity, главная фишка которой - отдельный сервер на Python! Самое главное, что это разрабатывается одним человеком (мной) и полностью с нуля!</p>
+        </div>
+    </section>
+
+    <section id="resources" class="content" style="display: none;">
+        <h2>Ресурсы</h2>
+        <div class="data-text">здесь будет ссылка для качков.</div>
+    </section>
+
+    <section id="server-info" class="content" style="display: none;">
+        <h2>Подключиться к официальному серверу LazyGuy</h2>
+        <div class="info_main">
+            <p>Вы можете подключиться к серверу следующими способами:</p>
+            <h3>Через Hamachi</h3>
+            <p>login: LazyGuy11</p>
+            <p>password: LazyGuy</p>
+            <p> Запустите игру и подключитесь к серверу через айпи главного устройства сервера Hamachi. (прим. порт 12345 иногда может меняться)</p>
+            
+            <h3>По прямому IP и порту</h3>
+            <p>(отсутствует на данный момент времени)</p>
+        </div>
+    </section>
+
+</main>
+
+</body>
+</html>
